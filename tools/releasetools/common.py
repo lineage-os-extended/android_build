@@ -107,7 +107,6 @@ PARTITIONS_WITH_CARE_MAP = ('system', 'vendor', 'product', 'product_services',
 class ErrorCode(object):
   """Define error_codes for failures that happen during the actual
   update package installation.
-
   Error codes 0-999 are reserved for failures before the package
   installation (i.e. low battery, package verification failure).
   Detailed code in 'bootable/recovery/error_code.h' """
@@ -179,7 +178,6 @@ def InitLogging():
 
 def Run(args, verbose=None, **kwargs):
   """Creates and returns a subprocess.Popen object.
-
   Args:
     args: The command represented as a list of strings.
     verbose: Whether the commands should be shown. Default to the global
@@ -189,7 +187,6 @@ def Run(args, verbose=None, **kwargs):
         subprocess.STDOUT respectively unless caller specifies any of them.
         universal_newlines will default to True, as most of the users in
         releasetools expect string output.
-
   Returns:
     A subprocess.Popen object.
   """
@@ -206,7 +203,6 @@ def Run(args, verbose=None, **kwargs):
 
 def RunAndWait(args, verbose=None, **kwargs):
   """Runs the given command waiting for it to complete.
-
   Args:
     args: The command represented as a list of strings.
     verbose: Whether the commands should be shown. Default to the global
@@ -214,7 +210,6 @@ def RunAndWait(args, verbose=None, **kwargs):
     kwargs: Any additional args to be passed to subprocess.Popen(), such as env,
         stdin, etc. stdout and stderr will default to subprocess.PIPE and
         subprocess.STDOUT respectively unless caller specifies any of them.
-
   Raises:
     ExternalError: On non-zero exit from the command.
   """
@@ -229,7 +224,6 @@ def RunAndWait(args, verbose=None, **kwargs):
 
 def RunAndCheckOutput(args, verbose=None, **kwargs):
   """Runs the given command and returns the output.
-
   Args:
     args: The command represented as a list of strings.
     verbose: Whether the commands should be shown. Default to the global
@@ -237,10 +231,8 @@ def RunAndCheckOutput(args, verbose=None, **kwargs):
     kwargs: Any additional args to be passed to subprocess.Popen(), such as env,
         stdin, etc. stdout and stderr will default to subprocess.PIPE and
         subprocess.STDOUT respectively unless caller specifies any of them.
-
   Returns:
     The output string.
-
   Raises:
     ExternalError: On non-zero exit from the command.
   """
@@ -279,20 +271,17 @@ def CloseInheritedPipes():
 
 def LoadInfoDict(input_file, repacking=False):
   """Loads the key/value pairs from the given input target_files.
-
   It reads `META/misc_info.txt` file in the target_files input, does sanity
   checks and returns the parsed key/value pairs for to the given build. It's
   usually called early when working on input target_files files, e.g. when
   generating OTAs, or signing builds. Note that the function may be called
   against an old target_files file (i.e. from past dessert releases). So the
   property parsing needs to be backward compatible.
-
   In a `META/misc_info.txt`, a few properties are stored as links to the files
   in the PRODUCT_OUT directory. It works fine with the build system. However,
   they are no longer available when (re)generating images from target_files zip.
   When `repacking` is True, redirect these properties to the actual files in the
   unzipped directory.
-
   Args:
     input_file: The input target_files file, which could be an open
         zipfile.ZipFile instance, or a str for the dir that contains the files
@@ -301,10 +290,8 @@ def LoadInfoDict(input_file, repacking=False):
         info dict (default: False). If so, it will rewrite a few loaded
         properties (e.g. selinux_fc, root_dir) to point to the actual files in
         target_files file. When doing repacking, `input_file` must be a dir.
-
   Returns:
     A dict that contains the parsed key/value pairs.
-
   Raises:
     AssertionError: On invalid input arguments.
     ValueError: On malformed input values.
@@ -523,12 +510,15 @@ def LoadRecoveryFSTab(read_helper, fstab_version, recovery_fstab_path,
     d[mount_point] = Partition(mount_point=mount_point, fs_type=pieces[2],
                                device=pieces[0], length=length, context=context)
 
+  global system_as_system
+  system_as_system = True
   # / is used for the system mount point when the root directory is included in
   # system. Other areas assume system is always at "/system" so point /system
   # at /.
   if system_root_image:
-    assert '/system' not in d and '/' in d
-    d["/system"] = d["/"]
+    if '/system' not in d:
+      system_as_system = False
+      d["/system"] = d["/"]
   return d
 
 
@@ -552,14 +542,12 @@ def AppendAVBSigningArgs(cmd, partition):
 
 def GetAvbChainedPartitionArg(partition, info_dict, key=None):
   """Constructs and returns the arg to build or verify a chained partition.
-
   Args:
     partition: The partition name.
     info_dict: The info dict to look up the key info and rollback index
         location.
     key: The key to be used for building or verifying the partition. Defaults to
         the key listed in info_dict.
-
   Returns:
     A string of form "partition:rollback_index_location:key" that can be used to
     build or verify vbmeta image.
@@ -575,12 +563,10 @@ def GetAvbChainedPartitionArg(partition, info_dict, key=None):
 def _BuildBootableImage(sourcedir, fs_config_file, info_dict=None,
                         has_ramdisk=False, two_step_image=False):
   """Build a bootable image from the specified sourcedir.
-
   Take a kernel, cmdline, and optionally a ramdisk directory from the input (in
   'sourcedir'), and turn them into a boot image. 'two_step_image' indicates if
   we are building a two-step special image (i.e. building a recovery image to
   be loaded into /boot in two-step OTAs).
-
   Return the image data, or None if sourcedir does not appear to contains files
   for building the requested image.
   """
@@ -646,6 +632,21 @@ def _BuildBootableImage(sourcedir, fs_config_file, info_dict=None,
   if os.access(fn, os.F_OK):
     cmd.append("--pagesize")
     cmd.append(open(fn).read().rstrip("\n"))
+
+  fn = os.path.join(sourcedir, "tagsaddr")
+  if os.access(fn, os.F_OK):
+    cmd.append("--tags-addr")
+    cmd.append(open(fn).read().rstrip("\n"))
+
+  fn = os.path.join(sourcedir, "ramdisk_offset")
+  if os.access(fn, os.F_OK):
+    cmd.append("--ramdisk_offset")
+    cmd.append(open(fn).read().rstrip("\n"))
+
+  fn = os.path.join(sourcedir, "dt")
+  if os.access(fn, os.F_OK):
+    cmd.append("--dt")
+    cmd.append(fn)
 
   args = info_dict.get("mkbootimg_args")
   if args and args.strip():
@@ -741,7 +742,6 @@ def _BuildBootableImage(sourcedir, fs_config_file, info_dict=None,
 def GetBootableImage(name, prebuilt_name, unpack_dir, tree_subdir,
                      info_dict=None, two_step_image=False):
   """Return a File object with the desired bootable image.
-
   Look for it in 'unpack_dir'/BOOTABLE_IMAGES under the name 'prebuilt_name',
   otherwise look for it under 'unpack_dir'/IMAGES, otherwise construct it from
   the source files in 'unpack_dir'/'tree_subdir'."""
@@ -786,7 +786,6 @@ def Gunzip(in_filename, out_filename):
 
 def UnzipToDir(filename, dirname, patterns=None):
   """Unzips the archive to the given directory.
-
   Args:
     filename: The name of the zip file to unzip.
     dirname: Where the unziped files will land.
@@ -812,14 +811,11 @@ def UnzipToDir(filename, dirname, patterns=None):
 
 def UnzipTemp(filename, pattern=None):
   """Unzips the given archive into a temporary directory and returns the name.
-
   Args:
     filename: If filename is of the form "foo.zip+bar.zip", unzip foo.zip into
     a temp dir, then unzip bar.zip into that_dir/BOOTABLE_IMAGES.
-
     pattern: Files to unzip from the archive. If omitted, will unzip the entire
     archvie.
-
   Returns:
     The name of the temporary directory.
   """
@@ -842,13 +838,11 @@ def GetUserImage(which, tmpdir, input_zip,
                  hashtree_info_generator=None,
                  reset_file_map=False):
   """Returns an Image object suitable for passing to BlockImageDiff.
-
   This function loads the specified image from the given path. If the specified
   image is sparse, it also performs additional processing for OTA purpose. For
   example, it always adds block 0 to clobbered blocks list. It also detects
   files that cannot be reconstructed from the block list, for whom we should
   avoid applying imgdiff.
-
   Args:
     which: The partition name.
     tmpdir: The directory that contains the prebuilt image and block map file.
@@ -888,9 +882,7 @@ def GetUserImage(which, tmpdir, input_zip,
 
 def GetNonSparseImage(which, tmpdir, hashtree_info_generator=None):
   """Returns a Image object suitable for passing to BlockImageDiff.
-
   This function loads the specified non-sparse image from the given path.
-
   Args:
     which: The partition name.
     tmpdir: The directory that contains the prebuilt image and block map file.
@@ -910,12 +902,10 @@ def GetNonSparseImage(which, tmpdir, hashtree_info_generator=None):
 def GetSparseImage(which, tmpdir, input_zip, allow_shared_blocks,
                    hashtree_info_generator=None):
   """Returns a SparseImage object suitable for passing to BlockImageDiff.
-
   This function loads the specified sparse image from the given path, and
   performs additional processing for OTA purpose. For example, it always adds
   block 0 to clobbered blocks list. It also detects files that cannot be
   reconstructed from the block list, for whom we should avoid applying imgdiff.
-
   Args:
     which: The partition name, e.g. "system", "vendor".
     tmpdir: The directory that contains the prebuilt image and block map file.
@@ -1030,16 +1020,12 @@ def GetKeyPasswords(keylist):
 
 def GetMinSdkVersion(apk_name):
   """Gets the minSdkVersion declared in the APK.
-
   It calls 'aapt' to query the embedded minSdkVersion from the given APK file.
   This can be both a decimal number (API Level) or a codename.
-
   Args:
     apk_name: The APK filename.
-
   Returns:
     The parsed SDK version string.
-
   Raises:
     ExternalError: On failing to obtain the min SDK version.
   """
@@ -1062,16 +1048,12 @@ def GetMinSdkVersion(apk_name):
 
 def GetMinSdkVersionInt(apk_name, codename_to_api_level_map):
   """Returns the minSdkVersion declared in the APK as a number (API Level).
-
   If minSdkVersion is set to a codename, it is translated to a number using the
   provided map.
-
   Args:
     apk_name: The APK filename.
-
   Returns:
     The parsed SDK version number.
-
   Raises:
     ExternalError: On failing to get the min SDK version number.
   """
@@ -1094,18 +1076,14 @@ def SignFile(input_name, output_name, key, password, min_api_level=None,
   """Sign the input_name zip/jar/apk, producing output_name.  Use the
   given key and password (the latter may be None if the key does not
   have a password.
-
   If whole_file is true, use the "-w" option to SignApk to embed a
   signature that covers the whole file in the archive comment of the
   zip file.
-
   min_api_level is the API Level (int) of the oldest platform this file may end
   up on. If not specified for an APK, the API Level is obtained by interpreting
   the minSdkVersion attribute of the APK's AndroidManifest.xml.
-
   codename_to_api_level_map is needed to translate the codename which may be
   encountered as the APK's minSdkVersion.
-
   Caller may optionally specify extra args to be passed to SignApk, which
   defaults to OPTIONS.extra_signapk_args if omitted.
   """
@@ -1148,12 +1126,9 @@ def SignFile(input_name, output_name, key, password, min_api_level=None,
 
 def CheckSize(data, target, info_dict):
   """Checks the data string passed against the max size limit.
-
   For non-AVB images, raise exception if the data is too big. Print a warning
   if the data is nearing the maximum size.
-
   For AVB images, the actual image size should be identical to the limit.
-
   Args:
     data: A string that contains all the data for the partition.
     target: The partition name. The ".img" suffix is optional.
@@ -1198,16 +1173,13 @@ def CheckSize(data, target, info_dict):
 
 def ReadApkCerts(tf_zip):
   """Parses the APK certs info from a given target-files zip.
-
   Given a target-files ZipFile, parses the META/apkcerts.txt entry and returns a
   tuple with the following elements: (1) a dictionary that maps packages to
   certs (based on the "certificate" and "private_key" attributes in the file;
   (2) a string representing the extension of compressed APKs in the target files
   (e.g ".gz", ".bro").
-
   Args:
     tf_zip: The input target_files ZipFile (already open).
-
   Returns:
     (certmap, ext): certmap is a dictionary that maps packages to certs; ext is
         the extension string of compressed APKs (e.g. ".gz"), or None if there's
@@ -1277,21 +1249,16 @@ def ReadApkCerts(tf_zip):
 
 COMMON_DOCSTRING = """
 Global options
-
   -p  (--path) <dir>
       Prepend <dir>/bin to the list of places to search for binaries run by this
       script, and expect to find jars in <dir>/framework.
-
   -s  (--device_specific) <file>
       Path to the Python module containing device-specific releasetools code.
-
   -x  (--extra) <key=value>
       Add a key/value pair to the 'extras' dict, which device-specific extension
       code may look at.
-
   -v  (--verbose)
       Show command lines being executed.
-
   -h  (--help)
       Display this usage message and exit.
 """
@@ -1383,7 +1350,6 @@ def MakeTempFile(prefix='tmp', suffix=''):
 
 def MakeTempDir(prefix='tmp', suffix=''):
   """Makes a temporary dir that will be cleaned up with a call to Cleanup().
-
   Returns:
     The absolute pathname of the new directory.
   """
@@ -1405,12 +1371,12 @@ class PasswordManager(object):
   def __init__(self):
     self.editor = os.getenv("EDITOR")
     self.pwfile = os.getenv("ANDROID_PW_FILE")
+    self.secure_storage_cmd = os.getenv("ANDROID_SECURE_STORAGE_CMD")
 
   def GetPasswords(self, items):
     """Get passwords corresponding to each string in 'items',
     returning a dict.  (The dict may have keys in addition to the
     values in 'items'.)
-
     Uses the passwords in $ANDROID_PW_FILE if available, letting the
     user edit that file to add more needed passwords.  If no editor is
     available, or $ANDROID_PW_FILE isn't define, prompts the user
@@ -1424,9 +1390,23 @@ class PasswordManager(object):
       missing = []
       for i in items:
         if i not in current or not current[i]:
-          missing.append(i)
+          #Attempt to load using ANDROID_SECURE_STORAGE_CMD
+          if self.secure_storage_cmd:
+            try:
+              os.environ["TMP__KEY_FILE_NAME"] = str(i)
+              ps = subprocess.Popen(self.secure_storage_cmd, shell=True, stdout=subprocess.PIPE)
+              output = ps.communicate()[0]
+              if ps.returncode == 0:
+                current[i] = output
+            except Exception as e:
+              print(e)
+              pass
+          if i not in current or not current[i]:
+            missing.append(i)
       # Are all the passwords already in the file?
       if not missing:
+        if "ANDROID_SECURE_STORAGE_CMD" in os.environ:
+          del os.environ["ANDROID_SECURE_STORAGE_CMD"]
         return current
 
       for i in missing:
@@ -1551,11 +1531,9 @@ def ZipWrite(zip_file, filename, arcname=None, perms=0o644,
 def ZipWriteStr(zip_file, zinfo_or_arcname, data, perms=None,
                 compress_type=None):
   """Wrap zipfile.writestr() function to work around the zip64 limit.
-
   Even with the ZIP64_LIMIT workaround, it won't allow writing a string
   longer than 2GiB. It gives 'OverflowError: size does not fit in an int'
   when calling crc32(bytes).
-
   But it still works fine to write a shorter string into a large zip file.
   We should use ZipWrite() whenever possible, and only use ZipWriteStr()
   when we know the string won't be too long.
@@ -1601,14 +1579,11 @@ def ZipWriteStr(zip_file, zinfo_or_arcname, data, perms=None,
 
 def ZipDelete(zip_filename, entries):
   """Deletes entries from a ZIP file.
-
   Since deleting entries from a ZIP file is not supported, it shells out to
   'zip -d'.
-
   Args:
     zip_filename: The name of the ZIP file.
     entries: The name of the entry, or the list of names to be deleted.
-
   Raises:
     AssertionError: In case of non-zero return from 'zip'.
   """
@@ -1689,6 +1664,11 @@ class DeviceSpecificParams(object):
     """Called at the end of full OTA installation; typically this is
     used to install the image for the device's baseband processor."""
     return self._DoCall("FullOTA_InstallEnd")
+
+  def FullOTA_PostValidate(self):
+    """Called after installing and validating /system; typically this is
+    used to resize the system partition after a block based installation."""
+    return self._DoCall("FullOTA_PostValidate")
 
   def IncrementalOTA_Assertions(self):
     """Called after emitting the block of assertions at the top of an
@@ -1835,7 +1815,6 @@ class Difference(object):
 
   def GetPatch(self):
     """Returns a tuple of (target_file, source_file, patch_data).
-
     patch_data may be None if ComputePatch hasn't been called, or if
     computing the patch failed.
     """
@@ -1965,7 +1944,6 @@ class BlockDifference(object):
 
   def WriteStrictVerifyScript(self, script):
     """Verify all the blocks in the care_map, including clobbered blocks.
-
     This differs from the WriteVerifyScript() function: a) it prints different
     error messages; b) it doesn't allow half-way updated images to pass the
     verification."""
@@ -2169,7 +2147,10 @@ PARTITION_TYPES = {
     "ext4": "EMMC",
     "emmc": "EMMC",
     "f2fs": "EMMC",
-    "squashfs": "EMMC"
+    "squashfs": "EMMC",
+    "ext2": "EMMC",
+    "ext3": "EMMC",
+    "vfat": "EMMC"
 }
 
 
@@ -2184,9 +2165,7 @@ def GetTypeAndDevice(mount_point, info):
 
 def ParseCertificate(data):
   """Parses and converts a PEM-encoded certificate into DER-encoded.
-
   This gives the same result as `openssl x509 -in <filename> -outform DER`.
-
   Returns:
     The decoded certificate bytes.
   """
@@ -2205,13 +2184,10 @@ def ParseCertificate(data):
 
 def ExtractPublicKey(cert):
   """Extracts the public key (PEM-encoded) from the given certificate file.
-
   Args:
     cert: The certificate filename.
-
   Returns:
     The public key string.
-
   Raises:
     AssertionError: On non-zero return from 'openssl'.
   """
@@ -2229,10 +2205,8 @@ def ExtractPublicKey(cert):
 
 def ExtractAvbPublicKey(key):
   """Extracts the AVB public key from the given public or private key.
-
   Args:
     key: The input key file, which should be PEM-encoded public or private key.
-
   Returns:
     The path to the extracted AVB public key file.
   """
@@ -2245,12 +2219,10 @@ def ExtractAvbPublicKey(key):
 def MakeRecoveryPatch(input_dir, output_sink, recovery_img, boot_img,
                       info_dict=None):
   """Generates the recovery-from-boot patch and writes the script to output.
-
   Most of the space in the boot and recovery images is just the kernel, which is
   identical for the two, so the resulting patch should be efficient. Add it to
   the output zip, along with a shell script that is run from init.rc on first
   boot to actually do the patching and install the new recovery image.
-
   Args:
     input_dir: The top-level input directory of the target-files.zip.
     output_sink: The callback function that writes the result.
@@ -2263,6 +2235,7 @@ def MakeRecoveryPatch(input_dir, output_sink, recovery_img, boot_img,
     info_dict = OPTIONS.info_dict
 
   full_recovery_image = info_dict.get("full_recovery_image") == "true"
+  use_bsdiff = info_dict.get("no_gzip_recovery_ramdisk") == "true"
 
   if full_recovery_image:
     output_sink("etc/recovery.img", recovery_img.data)
@@ -2273,7 +2246,7 @@ def MakeRecoveryPatch(input_dir, output_sink, recovery_img, boot_img,
     # With system-root-image, boot and recovery images will have mismatching
     # entries (only recovery has the ramdisk entry) (Bug: 72731506). Use bsdiff
     # to handle such a case.
-    if system_root_image:
+    if system_root_image or use_bsdiff:
       diff_program = ["bsdiff"]
       bonus_args = ""
       assert not os.path.exists(path)

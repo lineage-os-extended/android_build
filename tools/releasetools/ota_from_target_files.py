@@ -841,7 +841,7 @@ else if get_stage("%(bcb_dev)s") == "3/3" then
   script.Print(" ROM Information")
   script.Print(" Android version: %s"%(android_version))
   script.Print(" Build id: %s"%(build_id))
-  script.Print(" Security patch date: %s"%(ro.build.version.security_patch))
+  script.Print(" Security patch date: %s"%(security_patch))
   script.Print("----------------------------------------------")
 
   CopyInstallTools(output_zip)
